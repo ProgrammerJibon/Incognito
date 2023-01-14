@@ -1,12 +1,20 @@
-import React, { useState } from "react";
-import { WebView } from "react-native-webview";
-import { Bar } from "react-native-progress";
-import { Divider, Menu, Provider } from "react-native-paper";
+import React, {useState} from "react";
+import {WebView} from "react-native-webview";
+import {Bar} from "react-native-progress";
+import {Divider, Menu, Provider} from "react-native-paper";
 import styles from "./Styles";
-import {ActivityIndicator, Alert, BackHandler, StatusBar, TextInput, TouchableOpacity, View} from "react-native";
-import { FontAwesomeIcon } from "@fortawesome/react-native-fontawesome";
+import {
+    Alert,
+    BackHandler,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
+import {FontAwesomeIcon} from "@fortawesome/react-native-fontawesome";
 import * as Icon from "@fortawesome/free-solid-svg-icons";
-import prompt from 'react-native-prompt-android';
 
 
 let isValidHttpUrl=(str)=> {
@@ -31,7 +39,20 @@ const BrowserWebView = ({  }) => {
   const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
 
   const exit = () => {
-    BackHandler.exitApp();
+    Alert.alert(
+        'Exit App',
+        'Do you want to exit?\nAll site data like cookies, history and caches will be removed.',
+        [
+          {text: 'No', style: 'cancel'},
+          {text: 'Yes', onPress: () => {
+                  webView.clearCache();
+                  webView.clearFormData();
+                  webView.clearHistory();
+                  BackHandler.exitApp();
+              }},
+        ],
+        { cancelable: true });
+
   }
 
   const webViewGOBack = ()=>{
@@ -53,25 +74,29 @@ const BrowserWebView = ({  }) => {
   });
 
 
+
   const [link, setLink] = useState("https://duckduckgo.com/");
   const [textField, setTextField] = useState("https://duckduckgo.com/");
   const [progress, setProgress] = useState(0);
   const [dropDown, setDropDown] = useState(false);
-  let hideDropdown = ()=>setDropDown(false);
+    const [scrollPositionWebView, setScrollPositionWebView] = useState(0);
+    let hideDropdown = ()=>setDropDown(false);
   return (
-    <Provider style={styles.container}>
+    <Provider style={[styles.container]}>
       <StatusBar
           backgroundColor={'red'}
           animated={true}
       />
-      <View style={{flexDirection: "row", flexWrap: "wrap", alignSelf: "flex-start",width: "100%",}}>
+      <View style={{position: 'relative', flexDirection: "row", flexWrap: "wrap", alignSelf: "flex-start",width: "100%", backgroundColor: 'red'}}>
         <View style={{flex: 1}}>
-          <TextInput style={{padding: 16, color: 'gray'}} placeholderTextColor={'gray'} placeholder={"Enter URL"} value={textField} keyboardType={"url"} onChangeText={(e)=>{
+          <TextInput style={{padding: 16, color: 'white', backgroundColor: 'red'}} placeholderTextColor={'gray'} placeholder={"Enter URL"} value={textField} keyboardType={"url"} onChangeText={(e)=>{
             setTextField(e);
           }} onFocus={e => {
             setTextField(linkText);
           }} onBlur={e => {
             setTextField(titleText);
+          }} onPressIn={()=>{
+              setTextField(linkText);
           }} onSubmitEditing={e=>{
             if (isValidHttpUrl(e.nativeEvent.text)){
               setLink(e.nativeEvent.text);
@@ -85,45 +110,76 @@ const BrowserWebView = ({  }) => {
           <Menu
             visible={dropDown}
             onDismiss={hideDropdown}
-            anchor={(<TouchableOpacity style={{marginTop: 16,}} onPress={()=>setDropDown(true)}><FontAwesomeIcon size={25} color='gray'  icon={ Icon.faEllipsisVertical } /></TouchableOpacity>)}>
-            <Menu.Item onPress={() => {webView.reload();hideDropdown();}} title="Reload" />
-            <Menu.Item onPress={() => {webViewGOBack()}} title="Backward" />
-            <Menu.Item onPress={() => {webView.goForward();hideDropdown();}} title="Forward" />
+            contentStyle={{ backgroundColor: 'darkred'}}
+            anchor={(<TouchableOpacity style={{marginTop: 16}} onPress={()=>setDropDown(true)}><FontAwesomeIcon size={25} color='white'  icon={ Icon.faEllipsisVertical } /></TouchableOpacity>)}>
+            <Menu.Item titleStyle={{color: "white"}}  leadingIcon="reload" onPress={() => {webView.reload();hideDropdown();}} title="Reload" />
+            <Menu.Item titleStyle={{color: "white"}}  leadingIcon="arrow-left" onPress={() => {webViewGOBack()}} title="Backward" />
+            <Menu.Item titleStyle={{color: "white"}}  leadingIcon="arrow-right" onPress={() => {webView.goForward();hideDropdown();}} title="Forward" />
             <Divider />
-            <Menu.Item onPress={() => {/*if (navigation.canGoBack()){navigation.goBack();*/hideDropdown();exit();}} title="Close & Clear History" />
+            <Menu.Item titleStyle={{color: "white"}}  leadingIcon="location-exit" onPress={() => {/*if (navigation.canGoBack()){navigation.goBack();*/hideDropdown();exit();}} title="Exit" />
           </Menu>
         </View>
+          <Bar
+              style={[{position: 'absolute', bottom: 0, left: 0, right: 0}]}
+              width={null}
+              color={'white'}
+              borderRadius={0}
+              height={(progress > 0) ? 5 : 0}
+              animationType={'spring'}
+              indeterminate={(progress > 0.01 && progress < 0.25)}
+              borderWidth={0}
+              progress={progress}/>
       </View>
 
-      <Bar width={null} progress={progress} />
-      <WebView
-        ref={setWebView}
-        renderLoading={() => (
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <ActivityIndicator size="large" />
-          </View>
-        )}
-        onNavigationStateChange={(e)=>{
-          if (!e.loading){
-            titleText = e.title;
-            linkText = e.url;
-          }
-          setTextField(e.title);
-          setWebViewCanGoBack(e.canGoBack);
-        }}
-        onScroll={event => {
-          webView.requestFocus();
-        }}
-        source={{ uri: link }}
-        style={styles.wevView}
-        onError={(e)=>{
-          e.preventDefault();
-        }}
-        injectedJavaScript={"document.querySelectorAll(\"*\").forEach((item)=>{if(item.classList.contains(\"header-wrap--home\") || item.classList.contains(\"foot-home\")){item.remove();}});\n"}
-        onLoadProgress={e=>{
-          setProgress(e.nativeEvent.progress);
-        }}
-      ></WebView>
+
+      <ScrollView
+          contentContainerStyle={{ flexGrow: 1, backgroundColor: 'black' }}
+          refreshControl={(
+              <RefreshControl
+                  enabled={(scrollPositionWebView < 1)}
+                  onRefresh={()=>{
+                      if (scrollPositionWebView < 1){
+                          webView.reload();
+                      }
+                  }}
+                  refreshing={(progress > 0.01 && progress < 0.3)}
+              />
+          )}
+      >
+        <WebView
+            incognito={true}
+            bounces={true}
+            mixedContentMode={'always'}
+            ref={setWebView}
+            onNavigationStateChange={(e)=>{
+              if (!e.loading){
+                titleText = e.title;
+                linkText = e.url;
+                  setTextField(e.title);
+              }else{
+                  setTextField(e.url);
+              }
+              setWebViewCanGoBack(e.canGoBack);
+            }}
+            onScroll={event => {
+              webView.requestFocus();
+              setScrollPositionWebView(event.nativeEvent.contentOffset.y);
+            }}
+            source={{ uri: link }}
+            style={[styles.wevView, {backgroundColor:'transparent'}]}
+            onError={(e)=>{
+              e.preventDefault();
+            }}
+            injectedJavaScript={"document.querySelectorAll(\"*\").forEach((item)=>{if(item.classList.contains(\"header-wrap--home\") || item.classList.contains(\"foot-home\")){item.remove();}});\n"}
+            onLoadProgress={e=>{
+              setProgress(e.nativeEvent.progress);
+              if (e.nativeEvent.progress === 1){
+                  setProgress(0);
+              }
+            }}
+        ></WebView>
+      </ScrollView>
+
     </Provider>
   );
 };
